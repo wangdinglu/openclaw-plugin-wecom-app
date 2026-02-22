@@ -235,6 +235,46 @@ function resolveCommandAuthorized({ cfg, accountId, senderId }) {
 }
 
 // =============================================================================
+// Outbound target resolution
+// For normal replies, `to` is "wecom-app:<userid>".
+// For cron/system announcements, `to` might be a conversation ID or empty.
+// Falls back to defaultNotifyUser from config.
+// =============================================================================
+
+function resolveOutboundTarget(to, cfg) {
+  if (!to) {
+    return getDefaultNotifyUser(cfg);
+  }
+
+  // Strip channel prefix: "wecom-app:WangDingLu01" → "WangDingLu01"
+  let userId = to.replace(new RegExp(`^${CHANNEL_ID}:`), "");
+
+  // Strip additional prefixes that OpenClaw might add
+  userId = userId.replace(/^(group:|dm:)/, "");
+
+  // If userId looks like a valid WeCom userid (alphanumeric, not a UUID/hash), use it.
+  if (userId && /^[a-zA-Z0-9_-]+$/.test(userId) && userId.length <= 64) {
+    return userId;
+  }
+
+  // Fallback to configured default user for system/cron messages.
+  return getDefaultNotifyUser(cfg);
+}
+
+function getDefaultNotifyUser(cfg) {
+  const ch = cfg?.channels?.[CHANNEL_ID];
+  if (ch?.defaultNotifyUser) {
+    return ch.defaultNotifyUser;
+  }
+  // Fall back to first admin user if available.
+  const admins = ch?.adminUsers;
+  if (Array.isArray(admins) && admins.length > 0) {
+    return admins[0];
+  }
+  return null;
+}
+
+// =============================================================================
 // HTTP Handler — handles GET verification and POST messages
 // =============================================================================
 
@@ -701,6 +741,10 @@ const wecomAppChannelPlugin = {
           items: { type: "string" },
           default: [],
         },
+        defaultNotifyUser: {
+          type: "string",
+          description: "Default userid for cron/system notifications (falls back to first adminUser)",
+        },
       },
     },
     uiHints: {
@@ -760,8 +804,12 @@ const wecomAppChannelPlugin = {
   },
   outbound: {
     deliveryMode: "direct",
-    sendText: async ({ cfg: _cfg, to, text, accountId: _accountId }) => {
-      const userId = to.replace(new RegExp(`^${CHANNEL_ID}:`), "");
+    sendText: async ({ cfg, to, text, accountId: _accountId }) => {
+      const userId = resolveOutboundTarget(to, cfg);
+      if (!userId) {
+        logger.warn("outbound.sendText: no valid target", { to });
+        return { channel: CHANNEL_ID, messageId: `msg_skip_${Date.now()}` };
+      }
       try {
         await getApiClient().sendText(userId, text);
       } catch (err) {
@@ -772,8 +820,12 @@ const wecomAppChannelPlugin = {
         messageId: `msg_${Date.now()}`,
       };
     },
-    sendMedia: async ({ cfg: _cfg, to, text, mediaUrl, accountId: _accountId }) => {
-      const userId = to.replace(new RegExp(`^${CHANNEL_ID}:`), "");
+    sendMedia: async ({ cfg, to, text, mediaUrl, accountId: _accountId }) => {
+      const userId = resolveOutboundTarget(to, cfg);
+      if (!userId) {
+        logger.warn("outbound.sendMedia: no valid target", { to });
+        return { channel: CHANNEL_ID, messageId: `msg_skip_${Date.now()}` };
+      }
       const content = text
         ? `${text}\n\n${mediaUrl}`
         : mediaUrl;
