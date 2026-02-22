@@ -543,6 +543,7 @@ async function processInboundMessage({ message, account, config }) {
     route.agentId = targetAgentId;
     const normalizedPeerKind = peerKind === "dm" ? "direct" : peerKind;
     route.sessionKey = `agent:${targetAgentId}:${CHANNEL_ID}:${normalizedPeerKind}:${peerId}`;
+    route.mainSessionKey = `agent:${targetAgentId}:main`;
   }
 
   // Build inbound context
@@ -602,6 +603,23 @@ async function processInboundMessage({ message, account, config }) {
     })
     .catch((err) => {
       logger.error("Failed updating session meta", { error: err.message });
+    });
+
+  // Persist delivery route so cron/heartbeat can resolve the target.
+  const deliveryTo = isGroupChat ? `group:${chatId}` : peerId;
+  void core.session
+    .updateLastRoute({
+      storePath,
+      sessionKey: route.mainSessionKey || route.sessionKey,
+      deliveryContext: {
+        channel: CHANNEL_ID,
+        to: deliveryTo,
+        accountId: route.accountId,
+      },
+      ctx: ctxPayload,
+    })
+    .catch((err) => {
+      logger.error("Failed updating last route", { error: err.message });
     });
 
   // Serialize dispatches per user/group.
