@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-plugin-wecom-app",
+  "name": "wecom-app",
   "version": "0.1.0",
   "description": "Enterprise WeChat self-built application channel plugin for OpenClaw",
   "type": "module",
