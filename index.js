@@ -541,7 +541,8 @@ async function processInboundMessage({ message, account, config }) {
 
   if (targetAgentId) {
     route.agentId = targetAgentId;
-    route.sessionKey = `agent:${targetAgentId}:${peerKind}:${peerId}`;
+    const normalizedPeerKind = peerKind === "dm" ? "direct" : peerKind;
+    route.sessionKey = `agent:${targetAgentId}:${CHANNEL_ID}:${normalizedPeerKind}:${peerId}`;
   }
 
   // Build inbound context
