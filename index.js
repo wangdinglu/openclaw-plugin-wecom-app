@@ -913,8 +913,11 @@ const wecomAppChannelPlugin = {
         config: ctx.cfg,
       });
 
-      return {
-        shutdown: async () => {
+      // Keep the promise pending until the gateway signals shutdown via
+      // abortSignal.  Resolving immediately would make the channel manager
+      // think the channel exited and trigger an auto-restart loop.
+      return new Promise((resolve) => {
+        const shutdown = () => {
           logger.info("Gateway shutting down");
           for (const [, buf] of messageBuffers) {
             clearTimeout(buf.timer);
@@ -922,8 +925,13 @@ const wecomAppChannelPlugin = {
           messageBuffers.clear();
           _apiClient = null;
           unregister();
-        },
-      };
+          resolve();
+        };
+
+        if (ctx.abortSignal) {
+          ctx.abortSignal.addEventListener("abort", shutdown, { once: true });
+        }
+      });
     },
   },
 };
