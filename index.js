@@ -82,6 +82,10 @@ const DEBOUNCE_MS = 2000;
 const messageBuffers = new Map();
 const dispatchLocks = new Map();
 
+// Tracks WeCom userids we've seen, so the directory can resolve them for
+// cron/tool message delivery.
+const knownPeers = new Map();
+
 function setRuntime(runtime) {
   _runtime = runtime;
 }
@@ -362,6 +366,15 @@ async function wecomAppHttpHandler(req, res) {
       const content = (msg.content || "").trim();
       const isCommand = content.startsWith("/");
       const streamKey = msg.chatId || msg.fromUser;
+
+      // Track this user so directory.resolve() can find them later.
+      if (msg.fromUser) {
+        knownPeers.set(msg.fromUser, {
+          id: `${CHANNEL_ID}:${msg.fromUser}`,
+          name: msg.fromUser,
+          isBot: false,
+        });
+      }
 
       logger.info("Processing inbound message", {
         from: msg.fromUser,
@@ -798,8 +811,28 @@ const wecomAppChannelPlugin = {
     },
   },
   directory: {
-    self: async () => null,
-    listPeers: async () => [],
+    self: async () => ({
+      id: `${CHANNEL_ID}:bot`,
+      name: "WeChat App Bot",
+      isBot: true,
+    }),
+    resolve: async ({ to }) => {
+      const userId = (to || "").replace(new RegExp(`^${CHANNEL_ID}:`), "");
+      if (!userId) return null;
+      if (knownPeers.has(userId)) {
+        return knownPeers.get(userId);
+      }
+      // Accept any alphanumeric userid even if not yet seen
+      if (/^[a-zA-Z0-9_-]+$/.test(userId) && userId.length <= 64) {
+        return {
+          id: `${CHANNEL_ID}:${userId}`,
+          name: userId,
+          isBot: false,
+        };
+      }
+      return null;
+    },
+    listPeers: async () => Array.from(knownPeers.values()),
     listGroups: async () => [],
   },
   outbound: {
@@ -849,6 +882,22 @@ const wecomAppChannelPlugin = {
         corpId: account.corpId,
         agentId: account.agentId,
       });
+
+      // Seed knownPeers from config so directory can resolve them immediately.
+      const ch = ctx.cfg?.channels?.[CHANNEL_ID] || {};
+      const seedUsers = [
+        ...(Array.isArray(ch.adminUsers) ? ch.adminUsers : []),
+        ...(ch.defaultNotifyUser ? [ch.defaultNotifyUser] : []),
+      ];
+      for (const uid of seedUsers) {
+        if (uid && !knownPeers.has(uid)) {
+          knownPeers.set(uid, {
+            id: `${CHANNEL_ID}:${uid}`,
+            name: uid,
+            isBot: false,
+          });
+        }
+      }
 
       // Initialize the API client for outbound messages.
       _apiClient = new WecomApiClient({
