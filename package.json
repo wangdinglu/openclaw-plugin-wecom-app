@@ -1,0 +1,58 @@
+{
+  "name": "openclaw-plugin-wecom-app",
+  "version": "0.1.0",
+  "description": "Enterprise WeChat self-built application channel plugin for OpenClaw",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "crypto.js",
+    "dynamic-agent.js",
+    "logger.js",
+    "wecom-api.js",
+    "webhook.js",
+    "utils.js",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wangdinglu/openclaw-plugin-wecom-app.git"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "channel": {
+      "id": "wecom-app",
+      "label": "Enterprise WeChat App",
+      "selectionLabel": "Enterprise WeChat (Self-built App)",
+      "docsPath": "/channels/wecom-app",
+      "docsLabel": "wecom-app",
+      "blurb": "Enterprise WeChat self-built application with standard message API",
+      "order": 91,
+      "aliases": [
+        "wecom-app",
+        "wework-app"
+      ]
+    },
+    "install": {
+      "defaultChoice": "npm",
+      "npmSpec": "github:wangdinglu/openclaw-plugin-wecom-app"
+    }
+  },
+  "keywords": [
+    "openclaw",
+    "wecom",
+    "enterprise-wechat",
+    "self-built-app",
+    "chat",
+    "plugin"
+  ],
+  "author": "wangdinglu",
+  "license": "ISC"
+}

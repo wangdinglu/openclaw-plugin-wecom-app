@@ -1,0 +1,13 @@
+{
+  "id": "wecom-app",
+  "name": "OpenClaw WeCom App",
+  "description": "Enterprise WeChat self-built application channel plugin for OpenClaw",
+  "channels": [
+    "wecom-app"
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
